@@ -1,0 +1,17 @@
+{
+  "student_full": "Bùi Quang Hải",
+  "student_short": "Hải",
+  "course": "A1 Empower",
+  "sidebar_name": "Quang Hải · A1",
+  "title": "Ebook tự học 4 tuần cho Quang Hải",
+  "store_prefix": "qh4",
+  "file_prefix": "quang-hai",
+  "api_url": "",
+  "sheet_id": "",
+  "audio_folder_id": "",
+  "pass": 0.8,
+  "speak_ratio": 0.6,
+  "allow_miss": 1,
+  "tests": {"mockA": ["Đề thi thử A", "Đề A"], "mockB": ["Đề thi thử B", "Đề B"]},
+  "finals": ["mockA", "mockB"]
+}
