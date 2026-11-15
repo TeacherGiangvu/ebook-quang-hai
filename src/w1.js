@@ -14,8 +14,9 @@ INTRO=`
   <li><b>Học:</b> đọc khung <b>Ghi nhớ</b>, hoặc <b>Bảng từ</b> ở ngày học từ vựng. Bấm "Nghe" để nghe cách đọc, rồi bật "Che nghĩa" để tự kiểm tra.</li>
   <li><b>Làm bài:</b> làm bài điền từ và chọn đáp án, bấm "Kiểm tra". Câu sai thì đọc đáp án, hiểu vì sao, rồi bấm "Làm lại".</li>
   <li><b>Nói và ghi âm:</b> làm theo khung tím ở cuối ngày, nghe lại và tự chấm theo danh sách.</li>
-  <li><b>Tick "Đã học xong"</b> ở cuối ngày. Làm xong ngày này thì ngày sau mới mở.</li>
+  <li><b>Tick "Đã học xong"</b> ở cuối ngày. <b>Mỗi ngày chỉ học 1 bài:</b> tick xong hôm nay thì bài tiếp theo mở vào ngày mai.</li>
 </ol>
+<div class="callout"><b>Làm thật, đừng bỏ trống:</b> điểm của lần bấm "Kiểm tra" <b>đầu tiên</b> được ghi lại. Nếu một bài dưới 50% hoặc còn câu bỏ trống, Sổ điểm sẽ ghi rõ "làm chưa tốt" để thầy và bố mẹ xem.</div>
 <p><b>Tuần 1–3:</b> ngày 5 là ngày ôn và nói nhiều hơn, ngày 6 là bài kiểm tra 15 câu (cần đúng 12 câu). <b>Tuần 4:</b> thi thử 30 câu ở ngày 2 và ngày 4.</p>
 <div class="callout"><b>Hải chú ý:</b> em làm bài khá nhanh (bài 8A chỉ mất 2 phút và đúng 4/20). Đọc <b>cả câu</b> trước khi chọn, tìm chủ ngữ và từ chỉ thời gian (yesterday, now, last…) rồi mới trả lời.</div>
 

@@ -229,7 +229,9 @@ const CFG={
   speakRatio:0.6,       // tỉ lệ bài nói cần gửi để đạt tuần
   allowMiss:1,         // số ngày được phép bỏ trong một tuần mà vẫn đạt
   tests:{"mockA": ["Đề thi thử A", "Đề A"], "mockB": ["Đề thi thử B", "Đề B"]},             // tên hiển thị các bài kiểm tra không theo mẫu "wN": {"mockA":["Đề thi thử A","Đề A"]}
-  finals:["mockA", "mockB"]            // các bài thi cuối khoá, hiện ở ô tổng kết của Sổ điểm
+  finals:["mockA", "mockB"],           // các bài thi cuối khoá, hiện ở ô tổng kết của Sổ điểm
+  daily:true,                  // true = mỗi ngày theo lịch chỉ học xong 1 bài, bài sau mở vào hôm sau
+  low:0.5                       // lần Kiểm tra đầu dưới mức này (0.5 = 50%) hoặc có câu bỏ trống thì ghi chú khi tick xong ngày
 };
 const PCT=Math.round(CFG.pass*100);
 /* tên bài kiểm tra: dạng dài ("Bài kiểm tra tuần 1") hoặc ngắn ("Kiểm tra") */
@@ -262,8 +264,9 @@ INTRO=`
   <li><b>Học:</b> đọc khung <b>Ghi nhớ</b>, hoặc <b>Bảng từ</b> ở ngày học từ vựng. Bấm "Nghe" để nghe cách đọc, rồi bật "Che nghĩa" để tự kiểm tra.</li>
   <li><b>Làm bài:</b> làm bài điền từ và chọn đáp án, bấm "Kiểm tra". Câu sai thì đọc đáp án, hiểu vì sao, rồi bấm "Làm lại".</li>
   <li><b>Nói và ghi âm:</b> làm theo khung tím ở cuối ngày, nghe lại và tự chấm theo danh sách.</li>
-  <li><b>Tick "Đã học xong"</b> ở cuối ngày. Làm xong ngày này thì ngày sau mới mở.</li>
+  <li><b>Tick "Đã học xong"</b> ở cuối ngày. <b>Mỗi ngày chỉ học 1 bài:</b> tick xong hôm nay thì bài tiếp theo mở vào ngày mai.</li>
 </ol>
+<div class="callout"><b>Làm thật, đừng bỏ trống:</b> điểm của lần bấm "Kiểm tra" <b>đầu tiên</b> được ghi lại. Nếu một bài dưới 50% hoặc còn câu bỏ trống, Sổ điểm sẽ ghi rõ "làm chưa tốt" để thầy và bố mẹ xem.</div>
 <p><b>Tuần 1–3:</b> ngày 5 là ngày ôn và nói nhiều hơn, ngày 6 là bài kiểm tra 15 câu (cần đúng 12 câu). <b>Tuần 4:</b> thi thử 30 câu ở ngày 2 và ngày 4.</p>
 <div class="callout"><b>Hải chú ý:</b> em làm bài khá nhanh (bài 8A chỉ mất 2 phút và đúng 4/20). Đọc <b>cả câu</b> trước khi chọn, tìm chủ ngữ và từ chỉ thời gian (yesterday, now, last…) rồi mới trả lời.</div>
 
@@ -917,12 +920,12 @@ const fmtSec=s=>Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
 /* ---------- state: local (localStorage) or shared (db) ---------- */
 const PASS=CFG.pass;
 // Link "Ứng dụng web" của Apps Script (xem apps-script/HUONG-DAN.md). Để trống thì trang chạy riêng trên máy, không cần mã.
-const API_URL="";
+const API_URL="https://script.google.com/macros/s/AKfycbyGCkkm6YtAjXg52o7KdMmxrhzY9hAC7VLcSPV3G8ndh7m-HzqX7esqM06fp_R9Zclelg/exec";
 const CTX={remote:!!API_URL,online:false,code:null,role:null,canWrite:true,canEdit:false,status:"local"};
 const STATE={days:{},attempts:[],speaking:{},notes:{},config:{}};
 const dayId=(n,i)=>`w${n}d${i}`;
 function loadLocal(){
-  WEEKS.forEach(w=>w.days.forEach((d,i)=>{if(LS.get(CFG.store+":d:"+dayId(w.n,i+1))==="1")STATE.days[dayId(w.n,i+1)]={w:w.n,d:i+1,done:true,late:LS.get(CFG.store+":dl:"+dayId(w.n,i+1))==="1"}}));
+  WEEKS.forEach(w=>w.days.forEach((d,i)=>{if(LS.get(CFG.store+":d:"+dayId(w.n,i+1))==="1"){const id=dayId(w.n,i+1),r={w:w.n,d:i+1,done:true,late:LS.get(CFG.store+":dl:"+id)==="1"};const at=LS.get(CFG.store+":da:"+id);if(at)r.at=at;try{const f=JSON.parse(LS.get(CFG.store+":df:"+id)||"null");if(f&&f.length)r.flags=f}catch(e){}STATE.days[id]=r}}));
   try{STATE.attempts=JSON.parse(LS.get(CFG.store+":attempts")||"[]")}catch(e){STATE.attempts=[]}
   try{STATE.speaking=JSON.parse(LS.get(CFG.store+":speak")||"{}")}catch(e){STATE.speaking={}}
   try{STATE.config=JSON.parse(LS.get(CFG.store+":config")||"{}")}catch(e){STATE.config={}}
@@ -980,11 +983,24 @@ function dbSet(path,data){
 const isDone=(n,i)=>!!(STATE.days[dayId(n,i)]&&STATE.days[dayId(n,i)].done);
 /* học theo thứ tự: một ngày chỉ mở khi mọi ngày trước đó (kể cả tuần trước) đã xong */
 const seqOf=(n,i)=>{const w=WEEKS.findIndex(x=>x.n===n);return WEEKS.slice(0,w).reduce((t,x)=>t+x.days.length,0)+i-1};
-function isOpen(n,i){
-  if(!CTX.canWrite||isDone(n,i))return true;
+const localDay=d=>{const x=new Date(d);return x.getFullYear()+"-"+(x.getMonth()+1)+"-"+x.getDate()};
+/* mỗi ngày một bài: hôm nay đã tick xong một ngày học thì ngày kế tiếp chờ tới hôm sau */
+const doneToday=()=>{const t=localDay(Date.now());return Object.values(STATE.days).some(r=>r&&r.done&&r.at&&localDay(r.at)===t)};
+function seqOpen(n,i){
   const g=seqOf(n,i);
   for(const w of WEEKS)for(let k=1;k<=w.days.length;k++)if(seqOf(w.n,k)<g&&!isDone(w.n,k))return false;
   return true;
+}
+function isOpen(n,i){
+  if(!CTX.canWrite||isDone(n,i))return true;
+  if(!seqOpen(n,i))return false;
+  return !(CFG.daily&&doneToday());
+}
+/* lý do một ngày còn khoá, dùng cho dòng trên tiêu đề và thông báo khi bấm */
+function lockText(n,i){
+  if(seqOpen(n,i))return "Mở vào ngày mai · mỗi ngày học 1 bài";
+  const p=prevOf(n,i);
+  return `Chưa mở · cần học xong ${p.n!==n?"Tuần "+p.n+" · ":""}Ngày ${p.i} trước`;
 }
 function prevOf(n,i){
   if(i>1)return {n,i:i-1};
@@ -1001,13 +1017,26 @@ function dueOf(n,i){
   return t;
 }
 const isLate=(n,i)=>{const r=STATE.days[dayId(n,i)];return !!(r&&r.done&&r.late)};
-function setDone(n,i,v){
+function setDone(n,i,v,flags){
   const now=new Date(),due=dueOf(n,i);
   const rec={w:n,d:i,done:v,at:now.toISOString()};
   if(v&&due&&now>=due){rec.late=true;rec.due=due.toISOString()}
+  if(flags&&flags.length)rec.flags=flags;
   STATE.days[dayId(n,i)]=rec;
-  if(CTX.online)dbSet("days/"+dayId(n,i),rec);else{LS.set(CFG.store+":d:"+dayId(n,i),v?"1":"0");LS.set(CFG.store+":dl:"+dayId(n,i),rec.late?"1":"0")}
+  const id=dayId(n,i);
+  if(CTX.online)dbSet("days/"+id,rec);else{LS.set(CFG.store+":d:"+id,v?"1":"0");LS.set(CFG.store+":dl:"+id,rec.late?"1":"0");LS.set(CFG.store+":da:"+id,rec.at);LS.set(CFG.store+":df:"+id,JSON.stringify(rec.flags||[]))}
 }
+/* ghi chú điểm thấp / bỏ trống: lấy kết quả lần bấm Kiểm tra ĐẦU TIÊN của từng bài trong ngày */
+function dayFlags(det){
+  const out=[];
+  $$(".block.ex",det).forEach(sec=>{
+    const r=CHK.res(sec.id);if(!r||!r.total)return;
+    if(r.blank>0||r.ok/r.total<CFG.low){const h=$("h3",sec);out.push({h:(h?h.textContent:"Bài tập").slice(0,60),ok:r.ok,total:r.total,blank:r.blank||0})}
+  });
+  return out;
+}
+const flagKind=f=>[f.ok/f.total<CFG.low?"điểm thấp":"",f.blank?"bỏ trống":""].filter(Boolean).join(", ");
+const flagText=f=>`${f.h}: ${f.ok}/${f.total} câu đúng${f.blank?`, bỏ trống ${f.blank} câu`:""}`;
 function addAttempt(a){
   STATE.attempts.push(a);
   if(CTX.online)dbSet("attempts/"+a.id,a);else LS.set(CFG.store+":attempts",JSON.stringify(STATE.attempts));
@@ -1026,7 +1055,8 @@ function scoreOf(t){
 /* bài tập đã bấm Kiểm tra (lưu trên máy) — cần làm hết mới tick được "Đã học xong" */
 const CHK={
   get(id){return LS.get(CFG.store+":chk:"+id)==="1"},
-  set(id){LS.set(CFG.store+":chk:"+id,"1")}
+  set(id,r){LS.set(CFG.store+":chk:"+id,"1");if(r&&LS.get(CFG.store+":chkr:"+id)==null)LS.set(CFG.store+":chkr:"+id,JSON.stringify(r))},
+  res(id){try{return JSON.parse(LS.get(CFG.store+":chkr:"+id)||"null")}catch(e){return null}}
 };
 function dayLeft(det){
   return $$(".block.ex",det).filter(sec=>!CHK.get(sec.id)).length;
@@ -1104,15 +1134,18 @@ function renderWeek(w){
     if(!isOpen(w.n,di+1)){
       const p=prevOf(w.n,di+1);
       return `<details class="day locked" data-wd="${w.n}-${di+1}">
-      <summary><span class="dn">Ngày ${di+1}</span><span class="dt">${esc(d.title)}</span><span class="dm">${d.min} phút</span><span class="lk">Chưa mở · cần học xong ${p.n!==w.n?"Tuần "+p.n+" · ":""}Ngày ${p.i} trước</span></summary></details>`;
+      <summary><span class="dn">Ngày ${di+1}</span><span class="dt">${esc(d.title)}</span><span class="dm">${d.min} phút</span><span class="lk">${lockText(w.n,di+1)}</span></summary></details>`;
     }
     const open=(!done&&!opened)?(opened=true," open"):"";
     const due=dueOf(w.n,di+1);
-    const late=isLate(w.n,di+1)?`<span class="latetag">Hoàn thành muộn</span>`:"";
+    const rec=STATE.days[dayId(w.n,di+1)];
+    const fl=done&&rec&&rec.flags&&rec.flags.length?rec.flags:null;
+    const late=(isLate(w.n,di+1)?`<span class="latetag">Hoàn thành muộn</span>`:"")+(fl?`<span class="latetag">Điểm thấp / bỏ trống</span>`:"");
+    const flagNote=fl?`<p class="warnline">Khi tick xong, ngày này có bài làm chưa tốt (đã ghi vào Sổ điểm): ${fl.map(f=>esc(flagText(f))).join("; ")}.</p>`:"";
     const dueTxt=!done&&due?`<p class="donehint">Hạn: hết ngày ${new Date(due-1).toLocaleDateString("vi-VN")}. Làm sau hạn vẫn được lưu điểm nhưng sẽ ghi "Hoàn thành muộn".</p>`:"";
     return `<details class="day${done?" done":""}" data-wd="${w.n}-${di+1}"${open}>
     <summary><span class="dn">Ngày ${di+1}</span><span class="dt">${esc(d.title)}</span><span class="dm">${d.min} phút</span><span class="ok">Đã xong</span>${late}</summary>
-    <div class="daybody">${blocks}<label class="donebar"><input type="checkbox" data-act="day-done" data-w="${w.n}" data-d="${di+1}"${done?" checked":""}> ${isTest?"Đã làm xong bài kiểm tra":"Đã học xong ngày này"}</label><p class="donehint" data-left></p>${dueTxt}</div></details>`;
+    <div class="daybody">${blocks}<label class="donebar"><input type="checkbox" data-act="day-done" data-w="${w.n}" data-d="${di+1}"${done?" checked":""}> ${isTest?"Đã làm xong bài kiểm tra":"Đã học xong ngày này"}</label><p class="donehint" data-left></p>${flagNote}${dueTxt}</div></details>`;
   }).join("");
   const goals=w.goals.map(g=>`<li>${esc(g)}</li>`).join("");
   return `<div class="hero"><div class="eyebrow">Tuần ${w.n} · ${esc(w.sub)}</div><h1>${esc(w.title)}</h1>
@@ -1233,6 +1266,8 @@ function renderTracker(){
     const dots=w.days.map((d,i)=>`<i class="dot${isDone(w.n,i+1)?(isLate(w.n,i+1)?" late":" on"):""}" title="Ngày ${i+1}${isLate(w.n,i+1)?": hoàn thành muộn":""}"></i>`).join("");
     const lateDays=w.days.map((d,i)=>i+1).filter(i=>isLate(w.n,i));
     const lateLine=lateDays.length?`<p class="line"><span class="latetag">Hoàn thành muộn</span> Ngày ${lateDays.join(", ")}</p>`:"";
+    const flagDays=w.days.map((d,i)=>({i:i+1,r:STATE.days[dayId(w.n,i+1)]})).filter(x=>x.r&&x.r.done&&x.r.flags&&x.r.flags.length);
+    const flagLine=flagDays.length?`<div class="warnline">Học xong nhưng làm chưa tốt (lần Kiểm tra đầu dưới ${Math.round(CFG.low*100)}% hoặc bỏ trống):<ul class="why">${flagDays.map(x=>`<li>Ngày ${x.i}: ${x.r.flags.map(f=>esc(flagText(f))).join("; ")}</li>`).join("")}</ul></div>`:"";
     const tl=s.tests.map(t=>t.s?`${testName(t.id,true)}: lần đầu <b>${t.s.first}/${t.s.total}</b> (${Math.round(t.s.first/t.s.total*100)}%) · cao nhất ${t.s.best}/${t.s.total} · ${t.s.n} lần làm`:`${testName(t.id,true)}: chưa làm`).join("<br>");
     const reasons=(s.status==="fail"||s.status==="going"||s.late)&&s.reasons.length?`<ul class="why">${s.reasons.map(r=>`<li>${esc(r)}</li>`).join("")}</ul>`:"";
     const fast=s.fast?`<p class="warnline">Có lần làm bài kiểm tra quá nhanh (dưới 12 giây mỗi câu).</p>`:"";
@@ -1245,7 +1280,7 @@ function renderTracker(){
     return `<article class="wcard"><header><h3>Tuần ${w.n} · ${esc(w.title)}</h3><span class="status ${ui[1]}">${ui[0]}</span></header>
     <div class="dots" aria-label="${s.done}/${s.total} ngày đã học">${dots}<span>${s.done}/${s.total} ngày</span></div>
     <p class="line">${tl}</p>
-    ${lateLine}<p class="line">Bài nói đã gửi: <b>${s.sent}/${s.sids.length}</b></p>
+    ${lateLine}${flagLine}<p class="line">Bài nói đã gửi: <b>${s.sent}/${s.sids.length}</b></p>
     <p class="line muted">${s.last?"Hoạt động gần nhất: "+fmtDate(s.last):"Chưa có hoạt động"}</p>
     ${reasons}${fast}${noteHTML}</article>`;
   }).join("");
@@ -1409,7 +1444,7 @@ function checkFill(sec){
     fb.textContent=good?"Đúng":(inp.value.trim()?"Chưa đúng. Đáp án: ":"Chưa điền. Đáp án: ")+ans;
     if(good)ok++;
   });
-  CHK.set(sec.id);syncUI();
+  CHK.set(sec.id,{ok,total:inputs.length,blank:inputs.filter(i=>!i.value.trim()).length});syncUI();
   const sc=$(".score",sec);sc.textContent=`${ok}/${inputs.length} câu đúng`;
   sc.className="score "+(ok/inputs.length>=0.8?"pass":"fail");
 }
@@ -1436,7 +1471,7 @@ function checkMcq(sec){
     if(sel&&sel.value===correct){ok++;fb.textContent="";}
     else{fb.className="fb bad";fb.textContent=sel?"Đáp án đúng: "+correct:"Bạn chưa chọn. Đáp án đúng: "+correct}
   });
-  CHK.set(sec.id);syncUI();
+  CHK.set(sec.id,{ok,total:qs.length,blank:qs.filter(q=>!$("input:checked",q)).length});syncUI();
   const sc=$(".score",sec);
   const pct=Math.round(ok/qs.length*100);
   sc.textContent=`${ok}/${qs.length} câu đúng (${pct}%) · ${pct>=PCT?"Đạt":`Chưa đạt ${PCT}%`}`;
@@ -1508,10 +1543,12 @@ document.addEventListener("change",e=>{
     if(!el.checked){el.checked=true;return}
     const det=el.closest("details.day");
     if(dayLeft(det)){el.checked=false;syncUI();return}
-    if(!confirm("Xác nhận đã học xong ngày này? Sau khi tick sẽ không bỏ tick được, và ngày tiếp theo sẽ mở."))
+    const flags=dayFlags(det);
+    const warn=flags.length?`\n\nLưu ý: các bài sau làm chưa tốt ở lần Kiểm tra đầu và sẽ được ghi vào Sổ điểm cho giáo viên và phụ huynh xem:\n- ${flags.map(f=>flagText(f)+" ("+flagKind(f)+")").join("\n- ")}`:"";
+    if(!confirm(`Xác nhận đã học xong ngày này? Sau khi tick sẽ không bỏ tick được, và ngày tiếp theo sẽ mở ${CFG.daily?"vào ngày mai":"ngay"}.${warn}`))
       {el.checked=false;return}
     const n=+el.dataset.w,i=+el.dataset.d;
-    setDone(n,i,true);
+    setDone(n,i,true,flags);
     if(isLate(n,i))toast("Đã lưu. Ngày này được ghi là Hoàn thành muộn vì đã quá hạn.");
     openNext(n,i);
   }
@@ -1532,6 +1569,7 @@ function openNext(n,i){
   const w=WEEKS.find(x=>x.n===n);
   const nx=i<w.days.length?{n,i:i+1}:(WEEKS.find(x=>x.n===n+1)?{n:n+1,i:1}:null);
   if(!nx){renderPage(curPage());toast(`Chúc mừng ${CFG.student} đã học xong cả ${WEEKS.length} tuần!`);return}
+  if(CFG.daily){renderPage(curPage());toast(`Đã lưu. Hôm nay học xong rồi, ${nx.n!==n?"Tuần "+nx.n+" · ":""}Ngày ${nx.i} sẽ mở vào ngày mai.`);return}
   if(nx.n!==n){renderPage(curPage());toast(`Đã mở Tuần ${nx.n}. Bấm Tuần ${nx.n} ở thanh bên để học tiếp.`);return}
   renderPage(curPage());
   const det=$(`details.day[data-wd="${nx.n}-${nx.i}"]`);
@@ -1539,8 +1577,11 @@ function openNext(n,i){
 }
 document.addEventListener("click",e=>{
   const sm=e.target.closest("details.day.locked>summary");
-  if(sm){e.preventDefault();toast("Ngày này chưa mở. Hãy làm hết bài của ngày trước rồi tick Đã học xong.")}
+  if(sm){e.preventDefault();const [n,i]=sm.parentElement.dataset.wd.split("-").map(Number);toast(seqOpen(n,i)?"Hôm nay đã học xong 1 bài. Ngày này sẽ mở vào ngày mai.":"Ngày này chưa mở. Hãy làm hết bài của ngày trước rồi tick Đã học xong.")}
 },true);
+/* trang để mở qua nửa đêm: vẽ lại để mở bài của ngày mới */
+let lastDayKey=localDay(Date.now());
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&localDay(Date.now())!==lastDayKey){lastDayKey=localDay(Date.now());renderPage(curPage())}});
 
 /* ---------- start date (học viên chọn ở lần mở đầu tiên) ---------- */
 async function saveStart(v){

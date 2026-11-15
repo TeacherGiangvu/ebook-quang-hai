@@ -6,12 +6,26 @@
   "title": "Ebook tự học 4 tuần cho Quang Hải",
   "store_prefix": "qh4",
   "file_prefix": "quang-hai",
-  "api_url": "",
-  "sheet_id": "",
-  "audio_folder_id": "",
+  "api_url": "https://script.google.com/macros/s/AKfycbyGCkkm6YtAjXg52o7KdMmxrhzY9hAC7VLcSPV3G8ndh7m-HzqX7esqM06fp_R9Zclelg/exec",
+  "sheet_id": "1Tc4IXrl5QOeWtjl0TwqdBQJul6u_-svHgtxU43_Odzc",
+  "audio_folder_id": "1WXod0r92P_lgT7_SC26vtz9J7_zGUrUY",
   "pass": 0.8,
   "speak_ratio": 0.6,
   "allow_miss": 1,
-  "tests": {"mockA": ["Đề thi thử A", "Đề A"], "mockB": ["Đề thi thử B", "Đề B"]},
-  "finals": ["mockA", "mockB"]
+  "tests": {
+    "mockA": [
+      "Đề thi thử A",
+      "Đề A"
+    ],
+    "mockB": [
+      "Đề thi thử B",
+      "Đề B"
+    ]
+  },
+  "finals": [
+    "mockA",
+    "mockB"
+  ],
+  "daily_limit": true,
+  "low_score": 0.5
 }

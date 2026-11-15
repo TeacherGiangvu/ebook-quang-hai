@@ -6,12 +6,12 @@
  * Đổi mã đăng nhập: sửa cột "Mã" ở trang "Mã đăng nhập".
  */
 // ID của Google Sheet lưu dữ liệu. Để trống nếu script được tạo từ trong Sheet (Tiện ích mở rộng > Apps Script).
-var SHEET_ID = '';
+var SHEET_ID = '1Tc4IXrl5QOeWtjl0TwqdBQJul6u_-svHgtxU43_Odzc';
 var CODE_SHEET = 'Mã đăng nhập';
 var DATA_SHEET = 'Dữ liệu';
 var LOG_SHEET = 'Nhật ký';
 // Thư mục Drive lưu file ghi âm của học viên
-var AUDIO_FOLDER_ID = '';
+var AUDIO_FOLDER_ID = '1WXod0r92P_lgT7_SC26vtz9J7_zGUrUY';
 // Tên gọi học viên trong Nhật ký
 var STUDENT_NAME = 'Hải';
 // Tên các bài kiểm tra không theo mẫu wN (ví dụ đề thi thử)
@@ -140,7 +140,10 @@ function label_(role) { return role === 'student' ? STUDENT_NAME : role === 'tea
 function describe_(col, d) {
   d = d || {};
   var late = d.late ? ' (hoàn thành muộn)' : '';
-  if (col === 'days') return (d.done ? 'Học xong' : 'Bỏ tick') + ' tuần ' + d.w + ' ngày ' + d.d + late;
+  if (col === 'days') {
+    var fl = (d.flags || []).map(function (f) { return f.h + ' ' + f.ok + '/' + f.total + (f.blank ? ', bỏ trống ' + f.blank + ' câu' : ''); });
+    return (d.done ? 'Học xong' : 'Bỏ tick') + ' tuần ' + d.w + ' ngày ' + d.d + late + (fl.length ? ' · LÀM CHƯA TỐT: ' + fl.join('; ') : '');
+  }
   if (col === 'attempts') {
     var name = TEST_NAMES[d.test] || ('Kiểm tra tuần ' + String(d.test).slice(1));
     return name + ': ' + d.correct + '/' + d.total + (d.seconds ? ' (' + Math.round(d.seconds / 60) + ' phút)' : '') + late;
