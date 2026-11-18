@@ -10,6 +10,7 @@ var SHEET_ID = '1Tc4IXrl5QOeWtjl0TwqdBQJul6u_-svHgtxU43_Odzc';
 var CODE_SHEET = 'Mã đăng nhập';
 var DATA_SHEET = 'Dữ liệu';
 var LOG_SHEET = 'Nhật ký';
+var RUN_SHEET = 'Lượt làm bài';
 // Thư mục Drive lưu file ghi âm của học viên
 var AUDIO_FOLDER_ID = '1WXod0r92P_lgT7_SC26vtz9J7_zGUrUY';
 // Tên gọi học viên trong Nhật ký
@@ -22,8 +23,8 @@ var DEFAULT_CODES = [
   ['Giáo viên', 'teacher', 'giaovien' + Math.floor(1000 + Math.random() * 9000)]
 ];
 // Ai được ghi vào mục nào
-var WRITE = {student: ['days', 'attempts', 'speaking', 'config'], teacher: ['notes', 'config'], parent: []};
-var COLS = ['days', 'attempts', 'speaking', 'notes', 'config'];
+var WRITE = {student: ['days', 'attempts', 'speaking', 'config', 'runs'], teacher: ['notes', 'config'], parent: []};
+var COLS = ['days', 'attempts', 'speaking', 'notes', 'config', 'runs'];
 
 function doGet(e) { return out_({ok: true, info: 'Ebook Bùi Quang Hải API'}); }
 
@@ -93,6 +94,11 @@ function setup_(ss) {
   if (!ss.getSheetByName(LOG_SHEET)) {
     ss.insertSheet(LOG_SHEET).appendRow(['Thời điểm', 'Người', 'Việc']);
   }
+  if (!ss.getSheetByName(RUN_SHEET)) {
+    var rs = ss.insertSheet(RUN_SHEET);
+    rs.appendRow(['Bắt đầu', 'Kết thúc', 'Thời gian (giây)', 'Tuần', 'Ngày', 'Bài', 'Đúng', 'Tổng', '%', 'Muộn', 'Chi tiết (câu: trả lời ✓/✗)']);
+    rs.setFrozenRows(1);
+  }
 }
 
 function roleOf_(ss, code) {
@@ -107,7 +113,7 @@ function roleOf_(ss, code) {
 }
 
 function load_(ss) {
-  var data = {days: {}, attempts: {}, speaking: {}, notes: {}, config: {}};
+  var data = {days: {}, attempts: {}, speaking: {}, notes: {}, config: {}, runs: {}};
   var rows = ss.getSheetByName(DATA_SHEET).getDataRange().getValues();
   for (var i = 1; i < rows.length; i++) {
     var p = String(rows[i][0]).split('/');
@@ -129,10 +135,24 @@ function save_(ss, role, it) {
   var row = -1;
   for (var i = 1; i < paths.length; i++) if (paths[i][0] === it.path) { row = i + 1; break; }
   if (row > 0) sh.getRange(row, 2, 1, 3).setValues([[json, now, role]]);
-  else sh.appendRow([it.path, json, now, role]);
+  else {
+    sh.appendRow([it.path, json, now, role]);
+    if (col === 'runs') runRow_(ss, it.data);
+  }
   var what = describe_(col, it.data);
   if (what) ss.getSheetByName(LOG_SHEET).appendRow([now, label_(role), what]);
   return true;
+}
+
+// Ghi mỗi lượt làm bài thành 1 dòng dễ đọc ở trang "Lượt làm bài"
+function runRow_(ss, d) {
+  d = d || {};
+  var detail = (d.ans || []).map(function (a, i) { return (i + 1) + ': ' + (a[0] === '' ? '(trống)' : a[0]) + (a[1] ? ' ✓' : ' ✗'); }).join(' | ');
+  var pct = d.total ? Math.round(d.correct / d.total * 100) : '';
+  ss.getSheetByName(RUN_SHEET).appendRow([
+    d.start ? new Date(d.start) : '', d.end ? new Date(d.end) : '', d.secs || 0, d.w || '', d.d || '',
+    d.h || d.ex || '', d.correct, d.total, pct, d.late ? 'Muộn' : '', detail
+  ]);
 }
 
 function label_(role) { return role === 'student' ? STUDENT_NAME : role === 'teacher' ? 'Giáo viên' : 'Phụ huynh'; }
@@ -150,6 +170,8 @@ function describe_(col, d) {
   }
   if (col === 'speaking') return (d.sent ? 'Gửi bài nói: ' : 'Bỏ đánh dấu bài nói: ') + (d.title || '');
   if (col === 'notes') return 'Nhận xét tuần ' + d.w + ': ' + (d.text || '');
+  if (col === 'runs') return 'Làm bài tuần ' + d.w + ' ngày ' + d.d + ' – ' + (d.h || '') + ': ' + d.correct + '/' + d.total +
+    ' (' + (d.secs >= 60 ? Math.floor(d.secs / 60) + ' phút ' : '') + (d.secs % 60) + ' giây)' + late;
   if (col === 'config') return 'Ngày bắt đầu: ' + (d.start || '');
   return '';
 }
